@@ -1,0 +1,1 @@
+CONFIG_FILE='--config.file=/etc/ursus_exporter.yaml'
