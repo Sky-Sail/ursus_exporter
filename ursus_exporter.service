@@ -3,8 +3,9 @@ Description=Prometheus exporter to monitoring usrus engine
 After=network.target
 
 [Service]
-PrivateTmp=true
-ExecStart=/var/lib/prometheus/ursus_exporter/ursus_exporter
+WorkingDirectory=/var/lib/prometheus/ursus_exporter/
+ExecStart=/var/lib/prometheus/ursus_exporter/venv/bin/python /var/lib/prometheus/ursus_exporter/ursus_exporter.py
+Restart=on-abort
 
 [Install]
 WantedBy=multi-user.target
