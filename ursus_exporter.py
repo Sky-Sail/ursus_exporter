@@ -1,3 +1,4 @@
+""" ursus engine prometheus exporter """
 #! /usr/bin/env python3
 
 import logging
@@ -6,7 +7,6 @@ import argparse
 
 import os
 import sys
-import stat
 
 from w1thermsensor import W1ThermSensor
 
@@ -25,6 +25,7 @@ temp_sensors = Gauge(
 )
 
 def process_request(scrape_interval):
+    """ function to parsing sensors """
     for sensor in W1ThermSensor.get_available_sensors():
         temerature = sensor.get_temperature()
 
