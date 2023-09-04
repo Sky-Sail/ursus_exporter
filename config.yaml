@@ -1,0 +1,10 @@
+global:
+  listen_port: 9271
+  scrape_interval: 60s
+  log_level: info
+
+sensors:
+  - name: example_1
+    sensor_id: 00000da6f208
+  - name: example_2
+    sensor_id: 00000da6f209

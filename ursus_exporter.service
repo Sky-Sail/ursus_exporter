@@ -1,0 +1,11 @@
+[Unit]
+Description=Prometheus exporter to monitoring usrus engine
+After=network.target
+
+[Service]
+PrivateTmp=true
+ExecStart=/var/lib/prometheus/ursus_exporter/ursus_exporter
+
+[Install]
+WantedBy=multi-user.target
+
