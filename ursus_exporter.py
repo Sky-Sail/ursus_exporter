@@ -61,7 +61,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(message)s')
 
     # pare config
-    with open(args.config_file) as f:
+    with open(args.config_file, encoding="utf-8") as f:
         # check file permission. Correct is
         if oct(os.stat(args.config_file).st_mode) != oct(0o100600):
             logging.critical('Config file permission is wrong. Correct is 0600 (-rw-------).')
