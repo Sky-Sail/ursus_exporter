@@ -9,6 +9,7 @@ import os
 import sys
 
 from w1thermsensor import W1ThermSensor
+from w1thermsensor.errors import W1ThermSensorError,SensorNotReadyError
 
 from prometheus_client import start_http_server
 from prometheus_client import Gauge
@@ -26,22 +27,28 @@ temp_sensors = Gauge(
 
 def process_request(scrape_interval):
     """ function to parsing sensors """
-    for sensor in W1ThermSensor.get_available_sensors():
-        temerature = sensor.get_temperature()
+    try:
+        for sensor in W1ThermSensor.get_available_sensors():
+            temerature = sensor.get_temperature()
 
-        if sensor.id in sensors_friendly_names:
-            friendly_name = sensors_friendly_names[sensor.id]
-        else:
-            logging.debug('sensor %s hasnt friendly name :(', sensor.id )
-            friendly_name = ''
+            if sensor.id in sensors_friendly_names:
+                friendly_name = sensors_friendly_names[sensor.id]
+            else:
+                logging.debug('sensor %s hasnt friendly name :(', sensor.id )
+                friendly_name = ''
 
-        temp_sensors.labels(
-            sensor_id=sensor.id,
-            friendly_name=friendly_name
-        ).set( temerature )
+            temp_sensors.labels(
+                sensor_id=sensor.id,
+                friendly_name=friendly_name
+            ).set( temerature )
 
-        logging.debug('Sensor %s return %s', sensor.id, temerature)
-        time.sleep(scrape_interval)
+            logging.debug('Sensor %s return %s', sensor.id, temerature)
+    except SensorNotReadyError:
+        logging.warning('Failed to read sensor state. Sensor not ready yet.')
+    except W1ThermSensorError:
+        logging.warning('Fail to read sensor strate.')
+
+    time.sleep(scrape_interval)
 
 
 if __name__ == '__main__':
