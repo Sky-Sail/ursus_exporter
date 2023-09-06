@@ -2,3 +2,4 @@ pyyaml
 argparse
 w1thermsensor
 prometheus_client
+adafruit-circuitpython-ina219

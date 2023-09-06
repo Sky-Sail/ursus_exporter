@@ -7,6 +7,7 @@ import argparse
 
 import os
 import sys
+import time
 
 from w1thermsensor import W1ThermSensor
 from w1thermsensor.errors import W1ThermSensorError,SensorNotReadyError
@@ -17,22 +18,35 @@ from prometheus_client import Gauge
 import yaml
 from yaml.loader import SafeLoader
 
-sensors_friendly_names = {}
+import board
+from adafruit_ina219 import ADCResolution, BusVoltageRange, INA219
+
+temp_sensors_friendly_names = {}
+voltage_bus_names = {}
+voltage_bus = []
 
 temp_sensors = Gauge(
         'ursus_temperature',
-        'Temperature same parts engine in Celsius degrees',
+        'Temperature same parts engine [ in Celsius degrees ]',
         ["sensor_id", "friendly_name"]
+)
+
+voltage_sensor = Gauge(
+        'ursus_voltage',
+        'voltage on one of tree sensor [ in volts ]',
+        ["voltage_bus", "friendly_name"]
 )
 
 def process_request(scrape_interval):
     """ function to parsing sensors """
+    
+    # try read temp sensors
     try:
         for sensor in W1ThermSensor.get_available_sensors():
             temerature = sensor.get_temperature()
 
-            if sensor.id in sensors_friendly_names:
-                friendly_name = sensors_friendly_names[sensor.id]
+            if sensor.id in temp_sensors_friendly_names:
+                friendly_name = temp_sensors_friendly_names[sensor.id]
             else:
                 logging.debug('sensor %s hasnt friendly name :(', sensor.id )
                 friendly_name = ''
@@ -47,6 +61,21 @@ def process_request(scrape_interval):
         logging.warning('Failed to read sensor state. Sensor not ready yet.')
     except W1ThermSensorError:
         logging.warning('Fail to read sensor strate.')
+
+
+    # try read voltage sensors
+    for idx, sensor in enumerate(voltage_bus):
+        name = voltage_bus_names[ idx ]
+        if name == '':
+            name = 'voltage_bus_%i' % idx
+
+        voltage = sensor.bus_voltage
+        voltage_sensor.labels(
+            voltage_bus='voltage_bus_%i' % idx,
+            friendly_name=name
+        ).set( voltage )
+        logging.info('voltage on %s sensor', name)
+
 
     time.sleep(scrape_interval)
 
@@ -66,6 +95,16 @@ if __name__ == '__main__':
     SCRAPE_INTERVAL = -1
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(levelname)s: %(message)s')
+
+
+    i2c_bus = board.I2C()
+
+    voltage_bus.append( INA219(i2c_bus,addr=0x40) )
+    voltage_bus.append( INA219(i2c_bus,addr=0x41) )
+    voltage_bus.append( INA219(i2c_bus,addr=0x42) )
+
+    for bus in voltage_bus:
+        bus.bus_voltage_range = BusVoltageRange.RANGE_16V
 
     # pare config
     with open(args.config_file, encoding="utf-8") as f:
@@ -114,13 +153,35 @@ if __name__ == '__main__':
 
         logging.info('set scrape_interval to: %ss', SCRAPE_INTERVAL )
 
-        # temp sensors
-        for config_sensor in data['sensors']:
-            sensors_friendly_names[ config_sensor['sensor_id'] ] = config_sensor[ 'name' ]
-            logging.info(
-                    'sensor: %s has friendly_names: %s',
-                    config_sensor['sensor_id'], config_sensor['name']
-                    )
+        # configure sensors
+        if 'sensors' in data:
+            # temp sensors
+            if 'temperature' in data['sensors']:
+                for config_sensor in data['sensors']['temperature']:
+                    temp_sensors_friendly_names[ config_sensor['sensor_id'] ] = config_sensor[ 'name' ]
+                    logging.info(
+                            'temperature sensor: %s has friendly_names: %s',
+                            config_sensor['sensor_id'], config_sensor['name']
+                        )
+
+            if 'voltage' in data['sensors']:
+                voltage_bus_names[0] = voltage_bus_names[1] = voltage_bus_names[2] = ''
+
+                for config_sensor in data['sensors']['voltage']:
+                    if config_sensor['bus'] < 0 or config_sensor['bus'] > 2:
+                        logging.critical('give incorrect voltage bus number (bus name: %s)' % config_sensor['name'] )
+                        sys.exit(1)
+                    
+                    name = 'voltage_bus_%s' % config_sensor['bus']
+                    if 'name' in config_sensor:
+                        name = config_sensor['name']
+
+                    voltage_bus_names[ int(config_sensor['bus']) ] =  name
+                    logging.info(
+                            'voltage sensor: on %s bus has friendly_names: %s',
+                            config_sensor['bus'], name
+                        )
+
 
 
     # Start up the server to expose the metrics.
@@ -129,4 +190,4 @@ if __name__ == '__main__':
     start_http_server( LISTEN_PORT )
 
     while True:
-        process_request( SCRAPE_INTERVAL )
+       process_request( SCRAPE_INTERVAL )
